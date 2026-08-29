@@ -1,114 +1,140 @@
 import streamlit as st
 import pdfplumber
 import pytesseract
-from PIL import Image
+import google.generativeai as genai
 import datetime
+import json
+import pandas as pd
+import plotly.express as px
 
-# --- MODERNIZED LANGCHAIN IMPORTS ---
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
-from langchain_community.vectorstores import FAISS
-from langchain_classic.chains import create_retrieval_chain
-from langchain_classic.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate
+st.set_page_config(page_title="CAT Mega-Context Engine", page_icon="🧠", layout="wide")
+st.title("🧠 CAT Exam Knowledge Graph & Predictive Engine")
+st.markdown("Upload up to 10 years of past papers. This engine maps historical trends and renders interactive data visualizations of this year's predicted exam.")
 
-# ==========================================
-# 1. HOSTING UI & SETUP
-# ==========================================
-st.set_page_config(page_title="CAT Prep AI Pipeline", page_icon="🚀", layout="wide")
-st.title("🚀 Open-Source CAT Exam Prediction & Learning Pipeline")
-st.markdown("Ingest past papers, map semantic embeddings, and predict answers using free open-source LLMs.")
+# --- SIDEBAR CONFIGURATION ---
+st.sidebar.header("Engine Configuration")
+api_key = st.sidebar.text_input("Gemini API Key (Free)", type="password")
 
-st.sidebar.header("Pipeline Configuration")
-hf_token = st.sidebar.text_input("Hugging Face API Token (Free)", type="password")
-if not hf_token:
-    st.sidebar.warning("Please enter your free Hugging Face token to enable the Prediction Engine.")
+# --- INGESTION ENGINE ---
+uploaded_files = st.file_uploader(
+    "Upload Historical CAT Papers (Select multiple PDFs)", 
+    type="pdf", 
+    accept_multiple_files=True
+)
 
-# ==========================================
-# 2. INGESTION & SCANNING ENGINE
-# ==========================================
-def extract_data_from_pdf(uploaded_file):
-    text = ""
-    with pdfplumber.open(uploaded_file) as pdf:
-        for page in pdf.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-            else:
-                img = page.to_image(resolution=300).original
-                text += pytesseract.image_to_string(img) + "\n"
-    return text
+def extract_mega_corpus(files):
+    full_corpus = ""
+    for file in files:
+        full_corpus += f"\n--- PAPER: {file.name} ---\n"
+        with pdfplumber.open(file) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    full_corpus += text + "\n"
+                else:
+                    img = page.to_image(resolution=300).original
+                    full_corpus += pytesseract.image_to_string(img) + "\n"
+    return full_corpus
 
-# ==========================================
-# 3. LEARNING ENGINE (Vector DB)
-# ==========================================
-@st.cache_resource(show_spinner=False)
-def build_learning_engine(text):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
-    chunks = text_splitter.split_text(text)
-    
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vector_store = FAISS.from_texts(chunks, embeddings)
-    return vector_store
+# --- PREDICTION & VISUALIZATION ENGINE ---
+if st.button("Generate Knowledge Graph & Question Bank"):
+    if not api_key or not uploaded_files:
+        st.error("Please provide an API Key and at least one PDF.")
+        st.stop()
 
-# ==========================================
-# 4. PREDICTING ENGINE (Modern Architecture)
-# ==========================================
-def setup_predicting_engine(vector_store, token):
-    llm = HuggingFaceEndpoint(
-        repo_id="mistralai/Mistral-7B-Instruct-v0.2",
-        huggingfacehub_api_token=token,
-        temperature=0.2,
-        max_new_tokens=512
-    )
-    
-    # Modern Prompting System
-    system_prompt = (
-        "You are an expert CAT exam instructor. Use the provided context to answer the user's question accurately.\n\n"
-        "Context: {context}"
-    )
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{input}"),
-    ])
-    
-    # Modern Chain Construction
-    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    qa_chain = create_retrieval_chain(vector_store.as_retriever(search_kwargs={"k": 4}), question_answer_chain)
-    
-    return qa_chain
+    genai.configure(api_key=api_key)
+    # Using 1.5 Flash for the massive 1M token context window
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
-# ==========================================
-# 5. EXECUTION & DOWNLOADING ENGINE
-# ==========================================
-uploaded_file = st.file_uploader("Upload CAT Exam PDF (Question Paper / Syllabus)", type="pdf")
-
-if uploaded_file is not None and hf_token:
-    with st.spinner("Ingesting and Scanning PDF..."):
-        raw_text = extract_data_from_pdf(uploaded_file)
-        st.success("Ingestion Complete!")
+    with st.spinner("Ingesting PDFs into Mega-Context Memory..."):
+        corpus = extract_mega_corpus(uploaded_files)
         
-    with st.spinner("Learning Document Patterns (Building Vector DB)..."):
-        vector_store = build_learning_engine(raw_text)
-        qa_chain = setup_predicting_engine(vector_store, hf_token)
-        st.success("Learning Engine Ready!")
+    with st.spinner("Synthesizing Knowledge Graph & Generating JSON..."):
+        prompt = f"""
+        You are an elite CAT Exam Data Scientist analyzing {len(uploaded_files)} past papers.
+        You MUST output your entire response as a valid JSON object. Do not include markdown formatting like ```json in the output.
         
-    st.markdown("---")
-    query = st.text_input("Ask the Predicting Engine a question (e.g., 'Solve the quantitative aptitude question regarding train speeds from the document'):")
+        The JSON must strictly follow this exact structure:
+        {{
+            "written_analysis": "Write your full text report here including the Logic Trap Analysis, the Predictive Question Bank (3 QA, 2 DILR, 2 VARC), and detailed solutions. Use standard markdown spacing like \\n\\n for readability inside this string.",
+            "section_weightage": {{
+                "QA": 34,
+                "DILR": 32,
+                "VARC": 34
+            }},
+            "top_topics": [
+                {{"topic": "Algebra", "frequency_percentage": 25}},
+                {{"topic": "Reading Comp", "frequency_percentage": 24}},
+                {{"topic": "Arithmetic", "frequency_percentage": 20}},
+                {{"topic": "Data Arrangements", "frequency_percentage": 15}},
+                {{"topic": "Geometry", "frequency_percentage": 10}},
+                {{"topic": "Number Systems", "frequency_percentage": 6}}
+            ]
+        }}
+        
+        Ensure the numbers in the JSON reflect the actual trends from the provided corpus.
+        
+        HISTORICAL EXAM CORPUS:
+        {corpus[:800000]} 
+        """
+        
+        # Forcing the model to output raw JSON
+        response = model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
+    st.success("Pattern Analysis Complete!")
     
-    if st.button("Predict / Solve"):
-        with st.spinner("Predicting..."):
-            # Modern Invocation Format
-            response = qa_chain.invoke({"input": query})
-            result_text = response['answer']
-            
-            st.markdown("### Prediction Output:")
-            st.write(result_text)
-            
-            file_name = f"CAT_Prediction_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
-            st.download_button(
-                label="Download Prediction Output (TXT)",
-                data=f"Query: {query}\n\nPrediction:\n{result_text}",
-                file_name=file_name,
-                mime="text/plain"
+    # --- PARSING & PLOTTING ---
+    try:
+        # Load the JSON string from the AI into a Python dictionary
+        data = json.loads(response.text)
+        
+        st.markdown("### 📊 Exam Knowledge Graph Visualizations")
+        
+        # Create two columns for the charts
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Render a Pie Chart for Section Weightage
+            pie_data = data["section_weightage"]
+            fig1 = px.pie(
+                names=list(pie_data.keys()), 
+                values=list(pie_data.values()), 
+                title="Predicted Section Weightage",
+                color_discrete_sequence=px.colors.sequential.RdBu
             )
+            fig1.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig1, use_container_width=True)
+            
+        with col2:
+            # Render a Bar Chart for the Top Topics
+            bar_df = pd.DataFrame(data["top_topics"])
+            fig2 = px.bar(
+                bar_df, 
+                x="topic", 
+                y="frequency_percentage", 
+                title="Highest Frequency Topics (Predicted)",
+                text_auto=True,
+                color="frequency_percentage",
+                color_continuous_scale="Blues"
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+            
+        st.markdown("---")
+        st.markdown("### 📝 Written Analysis & Predictive Question Bank")
+        st.markdown(data["written_analysis"])
+        
+        # Download Button
+        file_name = f"CAT_Predictive_Engine_Output_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+        st.download_button(
+            label="📥 Download Written Analysis (TXT)",
+            data=data["written_analysis"],
+            file_name=file_name,
+            mime="text/plain"
+        )
+        
+    except json.JSONDecodeError:
+        st.error("Failed to parse the AI's data structure. The corpus may have confused the JSON generation. Try again.")
+        st.write(response.text) # Fallback to show raw output
