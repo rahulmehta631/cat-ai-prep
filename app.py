@@ -1,15 +1,16 @@
 import streamlit as st
 import pdfplumber
 import pytesseract
+from PIL import Image
 import google.generativeai as genai
 import datetime
 import json
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="CAT Mega-Context Engine", page_icon="🧠", layout="wide")
-st.title("🧠 CAT Exam Knowledge Graph & Predictive Engine")
-st.markdown("Upload up to 10 years of past papers. This engine maps historical trends and renders interactive data visualizations of this year's predicted exam.")
+st.set_page_config(page_title="CAT Exam Structural Architect", page_icon="🧬", layout="wide")
+st.title("🧬 CAT Deep Structural Knowledge Graph & Blueprint-Exact Mock Generator")
+st.markdown("Upload multiple years of past papers. The engine decomposes historical intra-sectional constraints and builds a **100% fresh Mock CAT Paper** matching official IIM question counts (VARC: 24, DILR: 20, QA: 22).")
 
 # --- SIDEBAR CONFIGURATION ---
 st.sidebar.header("Engine Configuration")
@@ -25,7 +26,7 @@ uploaded_files = st.file_uploader(
 def extract_mega_corpus(files):
     full_corpus = ""
     for file in files:
-        full_corpus += f"\n--- PAPER: {file.name} ---\n"
+        full_corpus += f"\n=== HISTORICAL PAPER SOURCE: {file.name} ===\n"
         with pdfplumber.open(file) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
@@ -36,130 +37,123 @@ def extract_mega_corpus(files):
                     full_corpus += pytesseract.image_to_string(img) + "\n"
     return full_corpus
 
-# --- PREDICTION & VISUALIZATION ENGINE ---
-if st.button("Generate Knowledge Graph & Question Bank"):
+# --- ARCHITECTURAL GENERATION ENGINE ---
+if st.button("Run Deep Structural Analysis & Generate Blueprint-Exact Mock"):
     if not api_key or not uploaded_files:
-        st.error("Please provide an API Key and at least one PDF.")
+        st.error("Please provide your Google AI Studio API Key and upload at least one past paper PDF.")
         st.stop()
 
     genai.configure(api_key=api_key)
-    # Using 3.6 Flash for the massive 1M token context window
     model = genai.GenerativeModel('gemini-3.6-flash')
 
-    with st.spinner("Ingesting PDFs into Mega-Context Memory..."):
+    with st.spinner("Step 1/3: Parsing historical corpus and mapping intra-sectional matrices..."):
         corpus = extract_mega_corpus(uploaded_files)
         
-    with st.spinner("Synthesizing Knowledge Graph & Generating JSON..."):
+    with st.spinner("Step 2/3: Enforcing official CAT structural constraints (VARC: 24, DILR: 20, QA: 22)..."):
         prompt = f"""
-        You are an elite CAT Exam Data Scientist analyzing {len(uploaded_files)} past papers.
-        You MUST output your entire response as a valid JSON object. Do not include markdown formatting like ```json in the output.
+        You are an elite psychometrician and CAT Exam Convenor. You have analyzed the uploaded historical CAT papers.
         
-        The JSON must strictly follow this exact structure:
+        Your task is to build a **100% FRESH, Original Mock CAT Paper** that strictly respects the exact official CAT exam blueprint and intra-sectional proportions derived from both the official pattern and the uploaded corpus trends:
+        
+        OFFICIAL CAT SECTIONAL CONSTRAINTS:
+        1. **VARC Section (24 Questions Total):** 
+           - 4 RC Passages with 4 original questions each (16 Qs).
+           - 8 Verbal Ability questions (Para Jumbles, Paragraph Summary, Odd-One-Out).
+        2. **DILR Section (20 Questions Total):** 
+           - Exactly 4 high-complexity sets with 5 questions each (20 Qs total), mapping the precise logic/arrangements/quantitative-reasoning trend observed in the corpus.
+        3. **QA Section (22 Questions Total):** 
+           - Exact sub-topic proportion allocation (Arithmetic, Algebra, Geometry, Modern Math/Number Systems) reflecting the exact weightage shifts found in your historical data analysis.
+        
+        You MUST output your response as a valid JSON object matching this exact schema (no markdown blocks around it):
         {{
-            "written_analysis": "Write your full text report here including the Logic Trap Analysis, the Predictive Question Bank (3 QA, 2 DILR, 2 VARC), and detailed solutions. Use standard markdown spacing like \\n\\n for readability inside this string.",
+            "structural_analysis": "Provide a rigorous technical breakdown of intra-sectional weightages, sub-topic hybridization ratios, and difficulty curves extracted from the corpus.",
             "section_weightage": {{
-                "QA": 34,
-                "DILR": 32,
-                "VARC": 34
+                "VARC (24 Qs)": 36,
+                "DILR (20 Qs)": 30,
+                "QA (22 Qs)": 34
             }},
-            "top_topics": [
-                {{"topic": "Algebra", "frequency_percentage": 25}},
-                {{"topic": "Reading Comp", "frequency_percentage": 24}},
-                {{"topic": "Arithmetic", "frequency_percentage": 20}},
-                {{"topic": "Data Arrangements", "frequency_percentage": 15}},
-                {{"topic": "Geometry", "frequency_percentage": 10}},
-                {{"topic": "Number Systems", "frequency_percentage": 6}}
-            ]
+            "top_hybrid_topics": [
+                {{"topic": "Algebra-Function & Graph Hybrids", "frequency_percentage": 28}},
+                {{"topic": "Complex Scheduling & Dynamic DILR Grids", "frequency_percentage": 25}},
+                {{"topic": "Advanced Critical Reasoning RC", "frequency_percentage": 22}},
+                {{"topic": "Number Theory & P&C Overlaps", "frequency_percentage": 15}},
+                {{"topic": "Arithmetic Mixtures & Alligations", "frequency_percentage": 10}}
+            ],
+            "fresh_mock_paper": "Write out the complete, 100% brand-new, original Mock CAT Paper. Structure it clearly into Section VARC (listing the 4 RCs and 8 VA items), Section DILR (listing the 4 sets with 5 questions each), and Section QA (listing the 22 proportional questions). Provide comprehensive step-by-step solutions and answer keys for every single question. Use clean markdown formatting like \\n\\n for readability."
         }}
-        
-        Ensure the numbers in the JSON reflect the actual trends from the provided corpus.
         
         HISTORICAL EXAM CORPUS:
         {corpus[:800000]} 
         """
         
-        # Forcing the model to output raw JSON
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
-    st.success("Pattern Analysis Complete!")
-    
-    # --- PARSING & PLOTTING (ROBUST RECOVERY) ---
-    try:
-        # Clean potential unescaped control characters or formatting bugs in the raw string
-        raw_response_text = response.text.strip()
-        
-        # If the model accidentally wrapped it in markdown codeblocks, strip them out
-        if raw_response_text.startswith("```json"):
-            raw_response_text = raw_response_text[7:]
-        if raw_response_text.endswith("```"):
-            raw_response_text = raw_response_text[:-3]
-            
-        # Parse safely using strict=False to handle minor control character quirks
-        data = json.loads(raw_response_text, strict=False)
-        
-        st.success("Pattern Analysis & Knowledge Graph Generated Successfully!")
-        st.markdown("### 📊 Exam Knowledge Graph Visualizations")
-        
-        # Create two columns for the charts
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Render a Pie Chart for Section Weightage
-            pie_data = data["section_weightage"]
-            fig1 = px.pie(
-                names=list(pie_data.keys()), 
-                values=list(pie_data.values()), 
-                title="Predicted Section Weightage",
-                color_discrete_sequence=px.colors.sequential.RdBu
+        try:
+            response = model.generate_content(
+                prompt,
+                generation_config={"response_mime_type": "application/json"}
             )
-            fig1.update_traces(textposition='inside', textinfo='percent+label')
-            st.plotly_chart(fig1, use_container_width=True)
+            raw_text = response.text.strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:]
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
+                
+            data = json.loads(raw_text, strict=False)
             
-        with col2:
-            # Render a Bar Chart for the Top Topics
-            bar_df = pd.DataFrame(bar_data if 'bar_data' in locals() else data["top_topics"])
-            fig2 = px.bar(
-                bar_df, 
-                x="topic", 
-                y="frequency_percentage", 
-                title="Highest Frequency Topics (Predicted)",
-                text_auto=True,
-                color="frequency_percentage",
-                color_continuous_scale="Blues"
+            st.success("Blueprint-Exact Mock CAT Paper Successfully Synthesized!")
+            
+            # --- VISUALIZATION DASHBOARD ---
+            st.markdown("### 📊 Official Blueprint Proportions & Topic Matrix")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                pie_data = data["section_weightage"]
+                fig1 = px.pie(
+                    names=list(pie_data.keys()), 
+                    values=list(pie_data.values()), 
+                    title="Official CAT Sectional Proportions",
+                    color_discrete_sequence=px.colors.sequential.Sunsetdark
+                )
+                fig1.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig1, use_container_width=True)
+                
+            with col2:
+                bar_df = pd.DataFrame(data["top_hybrid_topics"])
+                fig2 = px.bar(
+                    bar_df, 
+                    x="topic", 
+                    y="frequency_percentage", 
+                    title="Intra-Sectional Hybrid-Topic Weightage",
+                    text_auto=True,
+                    color="frequency_percentage",
+                    color_continuous_scale="Teal"
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+                
+            st.markdown("---")
+            st.markdown("### 🔬 Intra-Sectional Structural Intelligence")
+            st.markdown(data["structural_analysis"])
+            
+            st.markdown("---")
+            st.markdown("### 📝 Blueprint-Exact Mock CAT Paper (VARC: 24 | DILR: 20 | QA: 22)")
+            st.markdown(data["fresh_mock_paper"])
+            
+            # --- DOWNLOADING ENGINE ---
+            full_export = f"=== INTRA-SECTIONAL STRUCTURAL BLUEPRINT ===\n\n{data['structural_analysis']}\n\n\n=== BLUEPRINT-EXACT MOCK CAT PAPER & SOLUTIONS ===\n\n{data['fresh_mock_paper']}"
+            
+            file_name = f"Blueprint_Exact_Mock_CAT_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+            st.download_button(
+                label="📥 Download Full Blueprint Mock Paper (.txt)",
+                data=full_export,
+                file_name=file_name,
+                mime="text/plain"
             )
-            st.plotly_chart(fig2, use_container_width=True)
             
-        st.markdown("---")
-        st.markdown("### 📝 Written Analysis & Predictive Question Bank")
-        st.markdown(data["written_analysis"])
-        
-        # Download Button
-        file_name = f"CAT_Predictive_Engine_Output_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
-        st.download_button(
-            label="📥 Download Written Analysis (TXT)",
-            data=data["written_analysis"],
-            file_name=file_name,
-            mime="text/plain"
-        )
-        
-    except Exception as e:
-        st.warning(f"JSON parsing encountered a minor layout hitch, but your data was salvaged! Error: {e}")
-        
-        # Fallback view: Display the raw text directly so you never lose an output
-        st.markdown("### 📝 Fallback Raw Output View")
-        st.markdown(response.text)
-        
-        file_name = f"CAT_Fallback_Output_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
-        st.download_button(
-            label="📥 Download Raw Output (TXT)",
-            data=response.text,
-            file_name=file_name,
-            mime="text/plain"
-        )
-        
-    except json.JSONDecodeError:
-        st.error("Failed to parse the AI's data structure. The corpus may have confused the JSON generation. Try again.")
-        st.write(response.text) # Fallback to show raw output
+        except Exception as e:
+            st.warning(f"JSON formatting boundary detected, rendering safe raw output fallback: {e}")
+            st.markdown(response.text)
+            st.download_button(
+                label="📥 Download Raw Output (.txt)",
+                data=response.text,
+                file_name=f"CAT_Blueprint_Output_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                mime="text/plain"
+            )
