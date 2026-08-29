@@ -86,11 +86,21 @@ if st.button("Generate Knowledge Graph & Question Bank"):
         
     st.success("Pattern Analysis Complete!")
     
-    # --- PARSING & PLOTTING ---
+    # --- PARSING & PLOTTING (ROBUST RECOVERY) ---
     try:
-        # Load the JSON string from the AI into a Python dictionary
-        data = json.loads(response.text)
+        # Clean potential unescaped control characters or formatting bugs in the raw string
+        raw_response_text = response.text.strip()
         
+        # If the model accidentally wrapped it in markdown codeblocks, strip them out
+        if raw_response_text.startswith("```json"):
+            raw_response_text = raw_response_text[7:]
+        if raw_response_text.endswith("```"):
+            raw_response_text = raw_response_text[:-3]
+            
+        # Parse safely using strict=False to handle minor control character quirks
+        data = json.loads(raw_response_text, strict=False)
+        
+        st.success("Pattern Analysis & Knowledge Graph Generated Successfully!")
         st.markdown("### 📊 Exam Knowledge Graph Visualizations")
         
         # Create two columns for the charts
@@ -110,7 +120,7 @@ if st.button("Generate Knowledge Graph & Question Bank"):
             
         with col2:
             # Render a Bar Chart for the Top Topics
-            bar_df = pd.DataFrame(data["top_topics"])
+            bar_df = pd.DataFrame(bar_data if 'bar_data' in locals() else data["top_topics"])
             fig2 = px.bar(
                 bar_df, 
                 x="topic", 
@@ -131,6 +141,21 @@ if st.button("Generate Knowledge Graph & Question Bank"):
         st.download_button(
             label="📥 Download Written Analysis (TXT)",
             data=data["written_analysis"],
+            file_name=file_name,
+            mime="text/plain"
+        )
+        
+    except Exception as e:
+        st.warning(f"JSON parsing encountered a minor layout hitch, but your data was salvaged! Error: {e}")
+        
+        # Fallback view: Display the raw text directly so you never lose an output
+        st.markdown("### 📝 Fallback Raw Output View")
+        st.markdown(response.text)
+        
+        file_name = f"CAT_Fallback_Output_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+        st.download_button(
+            label="📥 Download Raw Output (TXT)",
+            data=response.text,
             file_name=file_name,
             mime="text/plain"
         )
