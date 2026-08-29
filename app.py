@@ -87,19 +87,28 @@ if st.button("Run Deep Structural Analysis & Generate Blueprint-Exact Mock"):
         """
         
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"}
-            )
-            raw_text = response.text.strip()
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
+            # response = model.generate_content(
+            #     prompt,
+            #     generation_config={"response_mime_type": "application/json"}
+            # )
+            # raw_text = response.text.strip()
+            # if raw_text.startswith("```json"):
+            #     raw_text = raw_text[7:]
+            # if raw_text.endswith("```"):
+            #     raw_text = raw_text[:-3]
                 
-            data = json.loads(raw_text, strict=False)
+            # data = json.loads(raw_text, strict=False)
+            
+            # st.success("Blueprint-Exact Mock CAT Paper Successfully Synthesized!")
+            # We remove response_mime_type="application/json" to prevent JSON boundary/escape character crashes on massive text blocks
+            response = model.generate_content(prompt)
+            raw_text = response.text.strip()
             
             st.success("Blueprint-Exact Mock CAT Paper Successfully Synthesized!")
+            
+            st.markdown("---")
+            st.markdown("### 📝 Blueprint-Exact Mock CAT Paper (VARC: 24 | DILR: 20 | QA: 22)")
+            st.markdown(raw_text)
             
             # --- VISUALIZATION DASHBOARD ---
             st.markdown("### 📊 Official Blueprint Proportions & Topic Matrix")
@@ -139,21 +148,32 @@ if st.button("Run Deep Structural Analysis & Generate Blueprint-Exact Mock"):
             
             # --- DOWNLOADING ENGINE ---
             full_export = f"=== INTRA-SECTIONAL STRUCTURAL BLUEPRINT ===\n\n{data['structural_analysis']}\n\n\n=== BLUEPRINT-EXACT MOCK CAT PAPER & SOLUTIONS ===\n\n{data['fresh_mock_paper']}"
-            
+            # --- DOWNLOADING ENGINE ---
+           
             file_name = f"Blueprint_Exact_Mock_CAT_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
             st.download_button(
                 label="📥 Download Full Blueprint Mock Paper (.txt)",
-                data=full_export,
+                data=raw_text,
                 file_name=file_name,
                 mime="text/plain"
             )
             
         except Exception as e:
-            st.warning(f"JSON formatting boundary detected, rendering safe raw output fallback: {e}")
-            st.markdown(response.text)
-            st.download_button(
-                label="📥 Download Raw Output (.txt)",
-                data=response.text,
-                file_name=f"CAT_Blueprint_Output_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                mime="text/plain"
-            )
+            st.error(f"Generation error: {e}")
+        #     file_name = f"Blueprint_Exact_Mock_CAT_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+        #     st.download_button(
+        #         label="📥 Download Full Blueprint Mock Paper (.txt)",
+        #         data=full_export,
+        #         file_name=file_name,
+        #         mime="text/plain"
+        #     )
+            
+        # except Exception as e:
+        #     st.warning(f"JSON formatting boundary detected, rendering safe raw output fallback: {e}")
+        #     st.markdown(response.text)
+        #     st.download_button(
+        #         label="📥 Download Raw Output (.txt)",
+        #         data=response.text,
+        #         file_name=f"CAT_Blueprint_Output_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+        #         mime="text/plain"
+        #     )
