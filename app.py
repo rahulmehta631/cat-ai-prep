@@ -43,8 +43,8 @@ if st.button("Generate Knowledge Graph & Question Bank"):
         st.stop()
 
     genai.configure(api_key=api_key)
-    # Using 1.5 Flash for the massive 1M token context window
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Using 3.6 Flash for the massive 1M token context window
+    model = genai.GenerativeModel('gemini-3.6-flash')
 
     with st.spinner("Ingesting PDFs into Mega-Context Memory..."):
         corpus = extract_mega_corpus(uploaded_files)
