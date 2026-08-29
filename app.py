@@ -1,0 +1,111 @@
+import streamlit as st
+import pdfplumber
+import pytesseract
+from PIL import Image
+import io
+import datetime
+import os
+
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.llms import HuggingFaceEndpoint
+from langchain.chains import RetrievalQA
+
+# ==========================================
+# 1. HOSTING UI & SETUP
+# ==========================================
+st.set_page_config(page_title="CAT Prep AI Pipeline", page_icon="🚀", layout="wide")
+st.title("🚀 Open-Source CAT Exam Prediction & Learning Pipeline")
+st.markdown("Ingest past papers, map semantic embeddings, and predict answers using free open-source LLMs.")
+
+# Sidebar configuration
+st.sidebar.header("Pipeline Configuration")
+hf_token = st.sidebar.text_input("Hugging Face API Token (Free)", type="password")
+if not hf_token:
+    st.sidebar.warning("Please enter your free Hugging Face token to enable the Prediction Engine.")
+
+# ==========================================
+# 2. INGESTION & SCANNING ENGINE
+# ==========================================
+def extract_data_from_pdf(uploaded_file):
+    text = ""
+    with pdfplumber.open(uploaded_file) as pdf:
+        for page in pdf.pages:
+            # Attempt native text extraction
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+            else:
+                # Fallback to OCR scanning for image-based PDFs
+                img = page.to_image(resolution=300).original
+                text += pytesseract.image_to_string(img) + "\n"
+    return text
+
+# ==========================================
+# 3. LEARNING ENGINE (Vector DB)
+# ==========================================
+@st.cache_resource(show_spinner=False)
+def build_learning_engine(text):
+    # Split ingested data into learnable chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+    chunks = text_splitter.split_text(text)
+    
+    # Map to semantic embeddings using free open-source model
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    vector_store = FAISS.from_texts(chunks, embeddings)
+    return vector_store
+
+# ==========================================
+# 4. PREDICTING ENGINE (LLM Inference)
+# ==========================================
+def setup_predicting_engine(vector_store, token):
+    # Leveraging Mistral-7B via free Hugging Face serverless endpoints
+    llm = HuggingFaceEndpoint(
+        repo_id="mistralai/Mistral-7B-Instruct-v0.2",
+        huggingfacehub_api_token=token,
+        temperature=0.2,
+        max_new_tokens=512
+    )
+    # Stitch Vector DB to the LLM
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=vector_store.as_retriever(search_kwargs={"k": 4})
+    )
+    return qa_chain
+
+# ==========================================
+# 5. EXECUTION & DOWNLOADING ENGINE
+# ==========================================
+uploaded_file = st.file_uploader("Upload CAT Exam PDF (Question Paper / Syllabus)", type="pdf")
+
+if uploaded_file is not None and hf_token:
+    with st.spinner("Ingesting and Scanning PDF..."):
+        raw_text = extract_data_from_pdf(uploaded_file)
+        st.success("Ingestion Complete!")
+        
+    with st.spinner("Learning Document Patterns (Building Vector DB)..."):
+        vector_store = build_learning_engine(raw_text)
+        qa_chain = setup_predicting_engine(vector_store, hf_token)
+        st.success("Learning Engine Ready!")
+        
+    st.markdown("---")
+    query = st.text_input("Ask the Predicting Engine a question (e.g., 'Solve the quantitative aptitude question regarding train speeds from the document'):")
+    
+    if st.button("Predict / Solve"):
+        with st.spinner("Predicting..."):
+            response = qa_chain.invoke(query)
+            result_text = response['result']
+            
+            st.markdown("### Prediction Output:")
+            st.write(result_text)
+            
+            # Downloading Engine
+            file_name = f"CAT_Prediction_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+            st.download_button(
+                label="Download Prediction Output (TXT)",
+                data=f"Query: {query}\n\nPrediction:\n{result_text}",
+                file_name=file_name,
+                mime="text/plain"
+            )
